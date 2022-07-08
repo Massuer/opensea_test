@@ -48,3 +48,40 @@ contract ERC1155Tradable is ERC1155, ERC1155MintBurn, ERC1155Metadata, Ownable {
   constructor(
     string memory _name,
     string memory _symbol,
+ address _proxyRegistryAddress
+  ) public {
+    name = _name;
+    symbol = _symbol;
+    proxyRegistryAddress = _proxyRegistryAddress;
+  }
+
+  function uri(
+    uint256 _id
+  ) public view returns (string memory) {
+    require(_exists(_id), "ERC721Tradable#uri: NONEXISTENT_TOKEN");
+    return Strings.strConcat(
+      baseMetadataURI,
+      Strings.uint2str(_id)
+    );
+  }
+
+  /**
+    * @dev Returns the total quantity for a token ID
+    * @param _id uint256 ID of the token to query
+    * @return amount of token in existence
+    */
+  function totalSupply(
+    uint256 _id
+  ) public view returns (uint256) {
+    return tokenSupply[_id];
+  }
+
+  /**
+   * @dev Will update the base URL of token's URI
+   * @param _newBaseMetadataURI New base URL of token's URI
+   */
+  function setBaseMetadataURI(
+    string memory _newBaseMetadataURI
+  ) public onlyOwner {
+    _setBaseMetadataURI(_newBaseMetadataURI);
+  }
