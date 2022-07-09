@@ -114,3 +114,58 @@ contract ERC1155Tradable is ERC1155, ERC1155MintBurn, ERC1155Metadata, Ownable {
     tokenSupply[_id] = _initialSupply;
     return _id;
   }
+
+  /**
+    * @dev Mints some amount of tokens to an address
+    * @param _to          Address of the future owner of the token
+    * @param _id          Token ID to mint
+    * @param _quantity    Amount of tokens to mint
+    * @param _data        Data to pass if receiver is contract
+    */
+  function mint(
+    address _to,
+    uint256 _id,
+    uint256 _quantity,
+    bytes memory _data
+  ) public creatorOnly(_id) {
+    _mint(_to, _id, _quantity, _data);
+    tokenSupply[_id] = tokenSupply[_id].add(_quantity);
+  }
+
+  /**
+    * @dev Mint tokens for each id in _ids
+    * @param _to          The address to mint tokens to
+    * @param _ids         Array of ids to mint
+    * @param _quantities  Array of amounts of tokens to mint per id
+    * @param _data        Data to pass if receiver is contract
+    */
+  function batchMint(
+    address _to,
+    uint256[] memory _ids,
+    uint256[] memory _quantities,
+    bytes memory _data
+  ) public {
+    for (uint256 i = 0; i < _ids.length; i++) {
+      uint256 _id = _ids[i];
+      require(creators[_id] == msg.sender, "ERC1155Tradable#batchMint: ONLY_CREATOR_ALLOWED");
+      uint256 quantity = _quantities[i];
+      tokenSupply[_id] = tokenSupply[_id].add(quantity);
+    }
+    _batchMint(_to, _ids, _quantities, _data);
+  }
+
+  /**
+    * @dev Change the creator address for given tokens
+    * @param _to   Address of the new creator
+    * @param _ids  Array of Token IDs to change creator
+    */
+  function setCreator(
+    address _to,
+    uint256[] memory _ids
+  ) public {
+    require(_to != address(0), "ERC1155Tradable#setCreator: INVALID_ADDRESS.");
+    for (uint256 i = 0; i < _ids.length; i++) {
+      uint256 id = _ids[i];
+      _setCreator(_to, id);
+    }
+  }
