@@ -169,3 +169,56 @@ contract ERC1155Tradable is ERC1155, ERC1155MintBurn, ERC1155Metadata, Ownable {
       _setCreator(_to, id);
     }
   }
+
+  /**
+   * Override isApprovedForAll to whitelist user's OpenSea proxy accounts to enable gas-free listings.
+   */
+  function isApprovedForAll(
+    address _owner,
+    address _operator
+  ) public view returns (bool isOperator) {
+    // Whitelist OpenSea proxy contract for easy trading.
+    ProxyRegistry proxyRegistry = ProxyRegistry(proxyRegistryAddress);
+    if (address(proxyRegistry.proxies(_owner)) == _operator) {
+      return true;
+    }
+
+    return ERC1155.isApprovedForAll(_owner, _operator);
+  }
+
+  /**
+    * @dev Change the creator address for given token
+    * @param _to   Address of the new creator
+    * @param _id  Token IDs to change creator of
+    */
+  function _setCreator(address _to, uint256 _id) internal creatorOnly(_id)
+  {
+      creators[_id] = _to;
+  }
+
+  /**
+    * @dev Returns whether the specified token exists by checking to see if it has a creator
+    * @param _id uint256 ID of the token to query the existence of
+    * @return bool whether the token exists
+    */
+  function _exists(
+    uint256 _id
+  ) internal view returns (bool) {
+    return creators[_id] != address(0);
+  }
+
+  /**
+    * @dev calculates the next token ID based on value of _currentTokenID
+    * @return uint256 for the next token ID
+    */
+  function _getNextTokenID() private view returns (uint256) {
+    return _currentTokenID.add(1);
+  }
+
+  /**
+    * @dev increments the value of _currentTokenID
+    */
+  function _incrementTokenTypeId() private  {
+    _currentTokenID++;
+  }
+}
