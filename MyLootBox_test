@@ -1,0 +1,105 @@
+pragma solidity ^0.5.11;
+
+import "openzeppelin-solidity/contracts/utils/ReentrancyGuard.sol";
+import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "./MyCollectible.sol";
+import "./MyFactory.sol";
+import "./ILootBox.sol";
+
+/**
+ * @title MyLootBox
+ * MyLootBox - a randomized and openable lootbox of MyCollectibles
+ */
+contract MyLootBox is ILootBox, Ownable, Pausable, ReentrancyGuard, MyFactory {
+  using SafeMath for uint256;
+
+  // Event for logging lootbox opens
+  event LootBoxOpened(uint256 indexed optionId, address indexed buyer, uint256 boxesPurchased, uint256 itemsMinted);
+  event Warning(string message, address account);
+
+  // Must be sorted by rarity
+  enum Class {
+    Common,
+    Rare,
+    Epic,
+    Legendary,
+    Divine,
+    Hidden
+  }
+  uint256 constant NUM_CLASSES = 6;
+
+  // NOTE: Price of the lootbox is set via sell orders on OpenSea
+  struct OptionSettings {
+    // Number of items to send per open.
+    // Set to 0 to disable this Option.
+    uint256 maxQuantityPerOpen;
+    // Probability in basis points (out of 10,000) of receiving each class (descending)
+    uint16[NUM_CLASSES] classProbabilities;
+    // Whether to enable `guarantees` below
+    bool hasGuaranteedClasses;
+    // Number of items you're guaranteed to get, for each class
+    uint16[NUM_CLASSES] guarantees;
+  }
+  mapping (uint256 => OptionSettings) public optionToSettings;
+  mapping (uint256 => uint256[]) public classToTokenIds;
+  mapping (uint256 => bool) public classIsPreminted;
+  uint256 seed;
+  uint256 constant INVERSE_BASIS_POINT = 10000;
+
+  /**
+   * @dev Example constructor. Calls setOptionSettings for you with
+   *      sample settings
+   * @param _proxyRegistryAddress The address of the OpenSea/Wyvern proxy registry
+   *                              On Rinkeby: "0xf57b2c51ded3a29e6891aba85459d600256cf317"
+   *                              On mainnet: "0xa5409ec958c83c3f309868babaca7c86dcb077c1"
+   * @param _nftAddress The address of the non-fungible/semi-fungible item contract
+   *                    that you want to mint/transfer with each open
+   */
+  constructor(
+    address _proxyRegistryAddress,
+    address _nftAddress
+  ) MyFactory(
+    _proxyRegistryAddress,
+    _nftAddress
+  ) public {
+    // Example settings and probabilities
+    // you can also call these after deploying
+    uint16[NUM_CLASSES] memory guarantees;
+    setOptionSettings(Option.Basic, 3, [7300, 2100, 400, 100, 50, 50], guarantees);
+    // Note that tokens ids will be one higher than the indexes used here.
+    guarantees[0] = 3;
+    setOptionSettings(Option.Premium, 5, [7200, 2100, 400, 200, 50, 50], guarantees);
+    guarantees[2] = 2;
+    guarantees[4] = 1;
+    setOptionSettings(Option.Gold, 7, [7000, 2100, 400, 400, 50, 50], guarantees);
+  }
+
+  //////
+  // INITIALIZATION FUNCTIONS FOR OWNER
+  //////
+
+  /**
+   * @dev If the tokens for some class are pre-minted and owned by the
+   * contract owner, they can be used for a given class by setting them here
+   */
+  function setClassForTokenId(
+    uint256 _tokenId,
+    uint256 _classId
+  ) public onlyOwner {
+    _checkTokenApproval();
+    _addTokenIdToClass(Class(_classId), _tokenId);
+  }
+
+  /**
+   * @dev Alternate way to add token ids to a class
+   * Note: resets the full list for the class instead of adding each token id
+   */
+  function setTokenIdsForClass(
+    Class _class,
+    uint256[] memory _tokenIds
+  ) public onlyOwner {
+    uint256 classId = uint256(_class);
+    classIsPreminted[classId] = true;
+    classToTokenIds[classId] = _tokenIds;
+  }
